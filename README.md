@@ -1,5 +1,5 @@
 # Blume E-commerce Business Analytics Project
-👉[Blume.html](https://raw.githubusercontent.com/meharpreetkaur-tech/blume-ecommerce-analytics/main/blume/Blume.html)
+👉[Blume.pdf](https://raw.githubusercontent.com/meharpreetkaur-tech/blume-ecommerce-analytics/main/blume/Blume.pdf)
 
 
 ---
