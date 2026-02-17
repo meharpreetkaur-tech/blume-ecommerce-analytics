@@ -21,10 +21,10 @@ The goal was to practice the type of analysis a Business Analyst Intern would do
 
 ## Files in This Repo
 
-- `blume_analysis.Rmd` → Full analysis in R  
-- `blume_analysis.html` → Rendered report (recommended to view first)  
-- `executive_summary.md` → 1-page stakeholder summary  
-- `/data/` → All datasets used in the project  
+- `Blume.Rmd` → Full analysis in R  
+- `Blume.html` → Rendered report (recommended to view first)  
+- `Blume_Executivesummary.Rmd` → 1-page stakeholder summary  
+- `/blume/` → All datasets used in the project  
 
 ---
 
