@@ -1,7 +1,8 @@
 # Blume E-commerce Business Analytics Project
+👉[Blume_Report.pdf](Blume_Report.pdf)
 
-Hi! I'm a third-year Statistics student interested in Business Analytics and consumer brands.
 
+---
 In this project, I built a realistic e-commerce analytics case study using simulated Shopify-style transaction data based on real product pricing from Blume (itsblume.com), a Vancouver-based wellness brand.
 
 The goal was to practice the type of analysis a Business Analyst Intern would do: revenue trends, pricing, profitability, churn, and forecasting.
@@ -21,10 +22,13 @@ The goal was to practice the type of analysis a Business Analyst Intern would do
 
 ## Files in This Repo
 
-- `Blume.Rmd` → Full analysis in R  
-- `Blume.html` → Rendered report (recommended to view first)  
-- `Blume_Executivesummary.Rmd` → 1-page stakeholder summary  
-- `/blume/` → All datasets used in the project  
+- ## Files in This Repo
+
+- [Blume.Rmd](Blume.Rmd) → Full analysis in R  
+- [Blume.html](Blume.html) → Rendered report (recommended to view first)  
+- [Blume_ExecutiveSummary.Rmd](Blume_ExecutiveSummary.Rmd) → 1-page stakeholder summary  
+- [blume/](blume/) → All datasets used in the project  
+ 
 
 ---
 
