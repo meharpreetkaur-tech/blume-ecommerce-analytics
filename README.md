@@ -34,13 +34,13 @@ The goal was to practice the type of analysis a Business Analyst Intern would do
 ## Example Outputs
 
 ### Monthly Revenue Trend
-![Revenue Trend](https://raw.githubusercontent.com/meharpreetkaur-tech/blume-ecommece-analytics/main/images/revenue_trend.png)
+![Revenue Trend](https://raw.githubusercontent.com/meharpreetkaur-tech/blume-ecommerce-analytics/main/images/revenue_trend.png)
 
 ### Top Products by Revenue
-![Top Products](https://raw.githubusercontent.com/meharpreetkaur-tech/blume-ecommece-analytics/main/images/top_producs.png)
+![Top Products](https://raw.githubusercontent.com/meharpreetkaur-tech/blume-ecommerce-analytics/main/images/top_producs.png)
 
 ### Subscription Churn Pattern
-![Churn Curve](https://raw.githubusercontent.com/meharpreetkaur-tech/blume-ecommece-analytics/main/images/churn.png)
+![Churn Curve](https://raw.githubusercontent.com/meharpreetkaur-tech/blume-ecommerce-analytics/main/images/churn.png)
 
 
 
