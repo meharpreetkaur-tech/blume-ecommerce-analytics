@@ -1,5 +1,5 @@
 # Blume E-commerce Business Analytics Project
-👉[Blume_Report.pdf](Blume_Report.pdf)
+👉[Blume.html](https://raw.githubusercontent.com/meharpreetkaur-tech/blume-ecommerce-analytics/main/blume/Blume.html)
 
 
 ---
@@ -24,9 +24,9 @@ The goal was to practice the type of analysis a Business Analyst Intern would do
 
 - ## Files in This Repo
 
-- [Blume.Rmd](Blume.Rmd) → Full analysis in R  
-- [Blume.html](Blume.html) → Rendered report (recommended to view first)  
-- [Blume_ExecutiveSummary.Rmd](Blume_ExecutiveSummary.Rmd) → 1-page stakeholder summary  
+- [Blume.Rmd](https://raw.githubusercontent.com/meharpreetkaur-tech/blume-ecommerce-analytics/main/blume/Blume.Rmd) → Full analysis in R  
+- [Blume.html](https://raw.githubusercontent.com/meharpreetkaur-tech/blume-ecommerce-analytics/main/blume/Blume.html) → Rendered report (recommended to view first)  
+- [Blume_ExecutiveSummary.Rmd](https://raw.githubusercontent.com/meharpreetkaur-tech/blume-ecommerce-analytics/main/blume/Blume_Executivesummary.Rmd) → 1-page stakeholder summary  
 - [blume/](blume/) → All datasets used in the project  
  
 
