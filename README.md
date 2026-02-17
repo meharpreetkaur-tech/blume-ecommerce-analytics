@@ -31,6 +31,19 @@ The goal was to practice the type of analysis a Business Analyst Intern would do
  
 
 ---
+## Example Outputs
+
+### Monthly Revenue Trend
+![Revenue Trend](https://raw.githubusercontent.com/meharpreetkaur-tech/blume-ecommece-analytics/main/imagess/revenue_trend.png)
+
+### Top Products by Revenue
+![Top Products](https://raw.githubusercontent.com/meharpreetkaur-tech/blume-ecommece-analytics/main/imagess/top_producs.png)
+
+### Subscription Churn Pattern
+![Churn Curve](https://raw.githubusercontent.com/meharpreetkaur-tech/blume-ecommece-analytics/main/imagess/churn.png)
+
+
+
 
 ## Key Insights 
 
