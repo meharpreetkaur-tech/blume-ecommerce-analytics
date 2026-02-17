@@ -1,0 +1,78 @@
+---
+title: "executive_summary.Rmd"
+output: html_document
+date: "2026-02-17"
+---
+# Executive Summary: Blume E-commerce Performance Review
+
+**Prepared for**: Leadership Team  
+**Analysis Period**: January 2024 – December 2025  
+**Currency**: CAD
+
+---
+
+## Key Performance Indicators
+
+| Metric | Value | Trend |
+|--------|-------|-------|
+| **Total Revenue** | $610K | Stable |
+| **Total Orders** | 15,000 | — |
+| **Average Order Value** | $40.65 | Slight ↑ |
+| **Gross Margin** | 59% | Stable |
+| **Subscription Revenue** | 18% of total | — |
+| **Monthly Churn** | 7% | Stable |
+| **Repeat Customer Rate** | 72% | — |
+
+---
+
+## Top 3 Insights
+
+### 1. Bundles Are Underutilized Revenue Drivers
+- **Build Your SuperBelly Bundle** = 8% of orders but **16% of revenue**
+- $79 AOV vs. $28 for single products
+- **Action**: Increase bundle prominence in marketing; test new bundle combinations
+
+### 2. Churn Is Concentrated Early
+- 7% monthly churn is competitive
+- Most churn occurs within **first 90 days**
+- **Action**: Implement early-lifecycle engagement (Month 1-3 check-ins)
+
+### 3. Pricing Discipline Is Healthy
+- 59% of orders at full price
+- Discounts strategic, not excessive
+- **Action**: Maintain current approach; avoid deeper promotional discounting
+
+---
+
+## 6-Month Revenue Outlook
+
+| Quarter | Forecast | Range (±10%) |
+|---------|----------|--------------|
+| Q1 2026 | ~$75K | $68K – $83K |
+| Q2 2026 | ~$76K | $69K – $84K |
+
+*Methodology: Trend + moving average blend (student-level approach)*
+
+---
+
+## Recommendations Summary
+
+| Priority | Initiative | Expected Impact |
+|----------|------------|-----------------|
+| **High** | Promote bundle products | +AOV, better unit economics |
+| **High** | Early subscriber engagement | Reduce first-90-day churn |
+| **Medium** | Monitor COGS on new SKUs | Protect 59% margin |
+| **Low** | Test seasonal promotions | Validate before committing budget |
+
+---
+
+## Data Notes
+
+- Data simulated using real Blume product pricing
+- Churn = subscription inactive after ~60 days
+- Analysis scope: Business Analyst Intern level
+
+---
+
+*Full analysis available in `blume_analysis.Rmd` with code and detailed methodology.*
+```

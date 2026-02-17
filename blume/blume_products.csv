@@ -1,0 +1,13 @@
+product_id,product_name,category,price,cogs,margin_pct
+P001,Blue Lavender Blend,Superfood Latte,25.0,9.0,64.0
+P002,Matcha Coconut Blend,Superfood Latte,25.0,9.0,64.0
+P003,Reishi Hot Cacao Blend,Superfood Latte,25.0,9.0,64.0
+P004,SuperBelly Strawberry Hibiscus,SuperBelly Hydration,32.0,12.8,60.0
+P005,Beetroot Blend,Superfood Latte,25.0,9.0,64.0
+P006,Turmeric Blend,Superfood Latte,25.0,9.0,64.0
+P007,SuperBelly Acai Pomegranate,SuperBelly Hydration,32.0,12.8,60.0
+P008,Salted Caramel Blend,Superfood Latte,25.0,9.0,64.0
+P009,SuperBelly Mango Passion Fruit,SuperBelly Hydration,32.0,12.8,60.0
+P010,Cloud Mug,Accessory,28.0,12.6,55.0
+P011,Shaker Cup,Accessory,20.0,9.0,55.0
+P012,Build Your SuperBelly Bundle,Bundle,79.0,35.5,55.0

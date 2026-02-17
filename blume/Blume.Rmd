@@ -1,0 +1,911 @@
+---
+title: "BLUME.Rmd"
+output: html_document
+date: "2025-09-17"
+---
+
+---
+title: "Blume E-commerce Analytics Case Study"
+subtitle: "Business Analyst Portfolio Project"
+author: "Meharpreet Kaur"
+date: "`r format(Sys.Date(), '%B %d, %Y')`"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    toc_depth: 3
+    theme: flatly
+    highlight: tango
+    code_folding: hide
+    df_print: paged
+  pdf_document:
+    toc: true
+    toc_depth: 3
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  echo = TRUE,
+  message = FALSE,
+  warning = FALSE,
+  fig.width = 10,
+  fig.height = 6,
+  fig.align = "center"
+)
+```
+
+## Business Context
+
+Blume is a Vancouver-based wellness brand that sells superfood latte blends and hydration products online.
+
+For this project, I wanted to practice a realistic Business Analyst-style workflow using simulated ecommerce transactions (based on real product pricing from Blume’s website).
+
+My main goal was to understand:
+
+- Which products drive the most revenue
+- How pricing and discounts affect order value
+- Whether subscriptions improve retention
+- What churn looks like over time
+- How monthly revenue could be forecasted in a simple way
+---
+
+## Dataset Overview
+
+Before jumping into analysis, I did a quick check of the dataset sizes to understand what I’m working with.
+
+The data includes products, customer orders, subscription activity, and monthly KPI summaries.
+
+
+# 1. Setup & Data Loading
+
+```{r load-libraries}
+# Load required packages
+library(tidyverse)
+library(lubridate)
+library(scales)
+library(kableExtra)
+
+# Set theme for all plots
+theme_set(theme_minimal(base_size = 12) +
+  theme(
+    plot.title = element_text(face = "bold", size = 14),
+    plot.subtitle = element_text(color = "gray50"),
+    legend.position = "bottom",
+    panel.grid.minor = element_blank()
+  ))
+
+# Blume brand colors
+blume_colors <- c("#7B68EE", "#E6A8D7", "#B8D4E3", "#98D8C8", "#F7DC6F")
+
+```
+
+```{r load-data}
+# Load all datasets
+customers <- read_csv("blume/blume_customers.csv")
+subscriptions <- read_csv("blume/blume_subscriptions.csv")
+monthly_kpis <- read_csv("blume/blume_monthly_kpis.csv")
+products <- read_csv("blume/blume_products.csv")
+orders <- read_csv("blume/blume_orders.csv")
+
+# Parse dates
+orders <- orders %>%
+  mutate(order_date = ymd(order_date),
+         month = ym(month))
+
+customers <- customers %>%
+  mutate(first_order_date = ymd(first_order_date))
+
+subscriptions <- subscriptions %>%
+  mutate(subscription_start_date = ymd(subscription_start_date),
+         subscription_end_date = ymd(subscription_end_date))
+
+monthly_kpis <- monthly_kpis %>%
+  mutate(month = ym(month))
+```
+
+```{r data-overview}
+# Quick data overview
+cat("=== Dataset Dimensions ===\n")
+cat("Products:", nrow(products), "SKUs\n")
+cat("Orders:", nrow(orders), "transactions\n")
+cat("Customers:", nrow(customers), "unique customers\n")
+cat("Subscriptions:", nrow(subscriptions), "subscription records\n")
+cat("Monthly KPIs:", nrow(monthly_kpis), "months of data\n")
+```
+
+---
+
+# 2. Revenue Drivers Analysis
+
+A good starting point for ecommerce analysis is figuring out what actually brings in the most revenue.
+
+So first, I looked at which Blume products are the biggest contributors to sales.
+
+
+## 2.1 Top Products by Revenue
+
+```{r top-products-revenue}
+# Calculate revenue by product
+product_revenue <- orders %>%
+  group_by(product_id) %>%
+  summarize(
+    total_revenue = sum(net_revenue),
+    total_orders = n(),
+    avg_price = mean(unit_price),
+    .groups = "drop"
+  ) %>%
+  left_join(products %>% select(product_id, product_name, category), by = "product_id") %>%
+  arrange(desc(total_revenue)) %>%
+  mutate(
+    revenue_share = total_revenue / sum(total_revenue) * 100,
+    cumulative_share = cumsum(revenue_share)
+  )
+
+# Display top 10
+product_revenue %>%
+  head(10) %>%
+  mutate(
+    total_revenue = dollar(total_revenue, prefix = "$"),
+    revenue_share = percent(revenue_share/100, accuracy = 0.1)
+  ) %>%
+  select(product_name, category, total_revenue, total_orders, revenue_share) %>%
+  kable(
+    col.names = c("Product", "Category", "Total Revenue", "Orders", "Revenue %"),
+    caption = "Top 10 Products by Revenue (CAD)"
+  ) %>%
+  kable_styling(bootstrap_options = c("striped", "hover"))
+```
+
+```{r top-products-chart}
+# Visualization
+product_revenue %>%
+  head(10) %>%
+  mutate(product_name = fct_reorder(product_name, total_revenue)) %>%
+  ggplot(aes(x = product_name, y = total_revenue, fill = category)) +
+  geom_col() +
+  geom_text(aes(label = dollar(total_revenue, scale = 0.001, suffix = "K")), 
+            hjust = -0.1, size = 3.5) +
+  coord_flip() +
+  scale_y_continuous(labels = dollar_format(), expand = expansion(mult = c(0, 0.15))) +
+  scale_fill_manual(values = blume_colors) +
+  labs(
+    title = "Top 10 Products by Revenue",
+    subtitle = "Build Your SuperBelly Bundle leads at ~$97K CAD",
+    x = NULL,
+    y = "Total Revenue (CAD)",
+    fill = "Category"
+  )
+```
+
+**Key Insight**: The "Build Your SuperBelly Bundle" is the strongest revenue driver at ~$97K (16% of total revenue), followed by individual SuperBelly Hydration products. This suggests customers value the convenience and perceived savings of bundles.
+
+## 2.2 Revenue by Category
+
+```{r revenue-by-category}
+category_revenue <- orders %>%
+  left_join(products, by = "product_id") %>%
+  group_by(category) %>%
+  summarize(
+    total_revenue = sum(net_revenue),
+    order_count = n(),
+    avg_order_value = mean(net_revenue),
+    .groups = "drop"
+  ) %>%
+  arrange(desc(total_revenue))
+
+# Pie chart
+category_revenue %>%
+  mutate(
+    pct = total_revenue / sum(total_revenue),
+    label = paste0(category, "\n", dollar(total_revenue, scale = 0.001, suffix = "K"),
+                   "\n(", percent(pct, accuracy = 0.1), ")")
+  ) %>%
+  ggplot(aes(x = "", y = total_revenue, fill = category)) +
+  geom_col(width = 1) +
+  coord_polar(theta = "y") +
+  geom_text(aes(label = label), position = position_stack(vjust = 0.5), size = 3) +
+  scale_fill_manual(values = blume_colors) +
+  labs(title = "Revenue Distribution by Category", fill = "Category") +
+  theme_void() +
+  theme(plot.title = element_text(face = "bold", hjust = 0.5))
+```
+
+## 2.3 Repeat Purchase Behavior
+
+```{r repeat-purchase}
+# Analyze customer purchase frequency
+customer_orders <- orders %>%
+  group_by(customer_id) %>%
+  summarize(
+    total_orders = n(),
+    total_spent = sum(net_revenue),
+    first_order = min(order_date),
+    last_order = max(order_date),
+    .groups = "drop"
+  )
+
+# Distribution of order counts
+order_freq_dist <- customer_orders %>%
+  count(total_orders, name = "customer_count") %>%
+  mutate(pct = customer_count / sum(customer_count))
+
+# Summary stats
+repeat_customers <- customer_orders %>%
+  filter(total_orders > 1) %>%
+  nrow()
+
+repeat_rate <- repeat_customers / nrow(customer_orders)
+
+cat("=== Repeat Purchase Summary ===\n")
+cat("Total unique customers:", nrow(customer_orders), "\n")
+cat("Repeat customers (2+ orders):", repeat_customers, sprintf("(%.1f%%)\n", repeat_rate * 100))
+cat("Average orders per customer:", round(mean(customer_orders$total_orders), 2), "\n")
+```
+
+```{r repeat-purchase-chart}
+order_freq_dist %>%
+  filter(total_orders <= 15) %>%
+  ggplot(aes(x = factor(total_orders), y = customer_count)) +
+  geom_col(fill = blume_colors[1]) +
+  geom_text(aes(label = customer_count), vjust = -0.5, size = 3) +
+  labs(
+    title = "Customer Purchase Frequency Distribution",
+    subtitle = sprintf("%.1f%% of customers made repeat purchases", repeat_rate * 100),
+    x = "Number of Orders",
+    y = "Number of Customers"
+  )
+```
+
+## 2.4 Subscription vs One-Time Revenue
+
+```{r sub-vs-onetime}
+# Revenue by channel
+channel_revenue <- orders %>%
+  group_by(channel) %>%
+  summarize(
+    total_revenue = sum(net_revenue),
+    order_count = n(),
+    avg_order_value = mean(net_revenue),
+    .groups = "drop"
+  ) %>%
+  mutate(revenue_share = total_revenue / sum(total_revenue))
+
+channel_revenue %>%
+  mutate(
+    total_revenue = dollar(total_revenue),
+    avg_order_value = dollar(avg_order_value),
+    revenue_share = percent(revenue_share, accuracy = 0.1)
+  ) %>%
+  kable(
+    col.names = c("Channel", "Total Revenue", "Orders", "Avg Order Value", "Revenue Share"),
+    caption = "Revenue by Sales Channel"
+  ) %>%
+  kable_styling(bootstrap_options = c("striped", "hover"))
+```
+
+```{r sub-trend-monthly}
+# Monthly subscription vs DTC trend
+channel_monthly <- orders %>%
+  group_by(month, channel) %>%
+  summarize(revenue = sum(net_revenue), .groups = "drop")
+
+ggplot(channel_monthly, aes(x = month, y = revenue, fill = channel)) +
+  geom_area(alpha = 0.8) +
+  scale_x_date(date_labels = "%b %Y", date_breaks = "3 months") +
+  scale_y_continuous(labels = dollar_format()) +
+  scale_fill_manual(values = c("DTC" = blume_colors[3], "Subscription" = blume_colors[1])) +
+  labs(
+    title = "Monthly Revenue: Subscription vs DTC",
+    subtitle = "Subscription revenue consistently contributes ~18% of monthly total",
+    x = NULL,
+    y = "Revenue (CAD)",
+    fill = "Channel"
+  ) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+**Key Insight**: Subscription orders make up about ~18% of total revenue here.This suggests subscriptions are a meaningful part of Blume’s sales, even if most customers still buy through one-time purchases.
+
+
+
+---
+
+# 3. Pricing & Discount Analysis
+Next, I wanted to understand pricing patterns across orders.
+
+In ecommerce, discounts are common, so I looked at how order values change when promotions are applied.
+
+## 3.1 Average Order Value Trends
+
+```{r aov-trend}
+# Calculate AOV from orders data
+aov_monthly <- orders %>%
+  group_by(month) %>%
+  summarize(
+    total_revenue = sum(net_revenue),
+    order_count = n(),
+    aov = total_revenue / order_count,
+    .groups = "drop"
+  )
+
+# Plot AOV trend
+ggplot(aov_monthly, aes(x = month, y = aov)) +
+  geom_line(color = blume_colors[1], linewidth = 1) +
+  geom_point(color = blume_colors[1], size = 2) +
+  geom_smooth(method = "lm", se = FALSE, linetype = "dashed", color = "gray50") +
+  geom_hline(yintercept = mean(aov_monthly$aov), linetype = "dotted", color = "red") +
+  annotate("text", x = min(aov_monthly$month) + 60, y = mean(aov_monthly$aov) + 0.5,
+           label = paste("Avg:", dollar(mean(aov_monthly$aov))), color = "red", size = 3) +
+  scale_y_continuous(labels = dollar_format(), limits = c(35, 50)) +
+  scale_x_date(date_labels = "%b %Y", date_breaks = "3 months") +
+  labs(
+    title = "Average Order Value (AOV) Trend",
+    subtitle = "Relatively stable AOV around $40.65 CAD with slight upward trend",
+    x = NULL,
+    y = "AOV (CAD)"
+  ) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+# Calculate trend
+aov_lm <- lm(aov ~ as.numeric(month), data = aov_monthly)
+cat("\nAOV Trend: ", ifelse(coef(aov_lm)[2] > 0, "Increasing", "Decreasing"), 
+    " at ~$", round(coef(aov_lm)[2] * 30, 2), " per month\n", sep = "")
+```
+
+## 3.2 Impact of Discounts on Revenue
+
+```{r discount-analysis}
+# Analyze discount distribution
+orders <- orders %>%
+  mutate(
+    discount_tier = case_when(
+      discount_pct == 0 ~ "No Discount",
+      discount_pct <= 0.05 ~ "1-5%",
+      discount_pct <= 0.10 ~ "6-10%",
+      discount_pct <= 0.15 ~ "11-15%",
+      TRUE ~ "15%+"
+    ),
+    discount_tier = factor(discount_tier, levels = c("No Discount", "1-5%", "6-10%", "11-15%", "15%+"))
+  )
+
+# Revenue by discount tier
+discount_impact <- orders %>%
+  group_by(discount_tier) %>%
+  summarize(
+    order_count = n(),
+    total_revenue = sum(net_revenue),
+    avg_unit_price = mean(unit_price),
+    avg_net_price = mean(net_revenue / quantity),
+    .groups = "drop"
+  ) %>%
+  mutate(
+    order_share = order_count / sum(order_count),
+    revenue_share = total_revenue / sum(total_revenue)
+  )
+
+# Table
+discount_impact %>%
+  mutate(
+    order_count = comma(order_count),
+    total_revenue = dollar(total_revenue),
+    avg_unit_price = dollar(avg_unit_price),
+    avg_net_price = dollar(avg_net_price),
+    order_share = percent(order_share),
+    revenue_share = percent(revenue_share)
+  ) %>%
+  kable(
+    col.names = c("Discount Tier", "Orders", "Revenue", "List Price", "Net Price", "Order %", "Revenue %"),
+    caption = "Revenue Analysis by Discount Tier"
+  ) %>%
+  kable_styling(bootstrap_options = c("striped", "hover"))
+```
+
+```{r discount-chart}
+# Visualization
+discount_impact %>%
+  pivot_longer(cols = c(order_share, revenue_share), names_to = "metric", values_to = "value") %>%
+  mutate(metric = ifelse(metric == "order_share", "Order Share", "Revenue Share")) %>%
+  ggplot(aes(x = discount_tier, y = value, fill = metric)) +
+  geom_col(position = "dodge") +
+  geom_text(aes(label = percent(value, accuracy = 0.1)), 
+            position = position_dodge(width = 0.9), vjust = -0.5, size = 3) +
+  scale_y_continuous(labels = percent_format(), expand = expansion(mult = c(0, 0.15))) +
+  scale_fill_manual(values = c(blume_colors[1], blume_colors[4])) +
+  labs(
+    title = "Impact of Discounts on Order Volume and Revenue",
+    subtitle = "~59% of orders are full-price, contributing 61% of revenue",
+    x = "Discount Tier",
+    y = "Share",
+    fill = NULL
+  )
+```
+
+**Key Insight**: 59% of orders occur at full price, generating 61% of revenue. The 15% subscription discount tier represents a strategic investment in customer retention.
+
+---
+
+# 4. Profitability Modeling
+
+Revenue alone doesn’t tell the full story, so I also estimated gross margin by product category.
+
+Since Blume’s exact costs aren’t public, I used reasonable COGS assumptions based on typical DTC wellness benchmarks.
+
+
+## 4.1 Gross Margin by SKU
+
+```{r margin-by-sku}
+# Join with product margins
+orders_with_margin <- orders %>%
+  left_join(products %>% select(product_id, product_name, category, cogs, margin_pct), by = "product_id") %>%
+  mutate(
+    gross_profit = net_revenue - (cogs * quantity),
+    actual_margin_pct = gross_profit / net_revenue * 100
+  )
+
+# Margin by product
+product_profitability <- orders_with_margin %>%
+  group_by(product_id, product_name, category, margin_pct) %>%
+  summarize(
+    total_revenue = sum(net_revenue),
+    total_cogs = sum(cogs * quantity),
+    gross_profit = sum(gross_profit),
+    realized_margin = (sum(gross_profit) / sum(net_revenue)) * 100,
+    .groups = "drop"
+  ) %>%
+  arrange(desc(gross_profit))
+
+# Display
+product_profitability %>%
+  mutate(
+    total_revenue = dollar(total_revenue),
+    gross_profit = dollar(gross_profit),
+    margin_pct = percent(margin_pct/100),
+    realized_margin = sprintf("%.1f%%", realized_margin)
+  ) %>%
+  select(product_name, category, total_revenue, gross_profit, margin_pct, realized_margin) %>%
+  kable(
+    col.names = c("Product", "Category", "Revenue", "Gross Profit", "List Margin", "Realized Margin"),
+    caption = "Profitability by Product (Ordered by Gross Profit)"
+  ) %>%
+  kable_styling(bootstrap_options = c("striped", "hover"))
+```
+
+```{r margin-chart}
+# Scatter plot: Revenue vs Gross Profit by category
+product_profitability %>%
+  ggplot(aes(x = total_revenue, y = gross_profit, color = category, size = total_revenue)) +
+  geom_point(alpha = 0.7) +
+  geom_text(aes(label = str_wrap(product_name, 15)), size = 2.5, vjust = -1, check_overlap = TRUE) +
+  geom_abline(slope = 0.59, intercept = 0, linetype = "dashed", color = "gray50") +
+  scale_x_continuous(labels = dollar_format(scale = 0.001, suffix = "K")) +
+  scale_y_continuous(labels = dollar_format(scale = 0.001, suffix = "K")) +
+  scale_color_manual(values = blume_colors) +
+  labs(
+    title = "Revenue vs Gross Profit by Product",
+    subtitle = "Dashed line = 59% margin benchmark",
+    x = "Total Revenue (CAD)",
+    y = "Gross Profit (CAD)",
+    color = "Category"
+  ) +
+  guides(size = "none")
+```
+
+## 4.2 Bundles vs Single Products
+
+```{r bundle-analysis}
+# Compare bundle vs single product performance
+bundle_comparison <- orders_with_margin %>%
+  mutate(is_bundle = category == "Bundle") %>%
+  group_by(is_bundle) %>%
+  summarize(
+    order_count = n(),
+    total_revenue = sum(net_revenue),
+    total_gross_profit = sum(gross_profit),
+    avg_order_value = mean(net_revenue),
+    avg_margin = mean(actual_margin_pct),
+    .groups = "drop"
+  ) %>%
+  mutate(
+    type = ifelse(is_bundle, "Bundle", "Single Product"),
+    revenue_share = total_revenue / sum(total_revenue),
+    profit_share = total_gross_profit / sum(total_gross_profit)
+  )
+
+bundle_comparison %>%
+  select(type, order_count, total_revenue, total_gross_profit, avg_order_value, avg_margin) %>%
+  mutate(
+    order_count = comma(order_count),
+    total_revenue = dollar(total_revenue),
+    total_gross_profit = dollar(total_gross_profit),
+    avg_order_value = dollar(avg_order_value),
+    avg_margin = sprintf("%.1f%%", avg_margin)
+  ) %>%
+  kable(
+    col.names = c("Type", "Orders", "Revenue", "Gross Profit", "AOV", "Avg Margin %"),
+    caption = "Bundle vs Single Product Performance"
+  ) %>%
+  kable_styling(bootstrap_options = c("striped", "hover"))
+```
+
+```{r bundle-chart}
+# Visualization
+bundle_comparison %>%
+  select(type, revenue_share, profit_share) %>%
+  pivot_longer(-type, names_to = "metric", values_to = "value") %>%
+  mutate(metric = ifelse(metric == "revenue_share", "Revenue Share", "Profit Share")) %>%
+  ggplot(aes(x = type, y = value, fill = metric)) +
+  geom_col(position = "dodge", width = 0.7) +
+  geom_text(aes(label = percent(value, accuracy = 0.1)), 
+            position = position_dodge(width = 0.7), vjust = -0.5, size = 4) +
+  scale_y_continuous(labels = percent_format(), expand = expansion(mult = c(0, 0.15))) +
+  scale_fill_manual(values = c(blume_colors[1], blume_colors[4])) +
+  labs(
+    title = "Bundle vs Single Product Contribution",
+    subtitle = "Bundles: 16% of revenue, 15% of gross profit",
+    x = NULL,
+    y = "Share",
+    fill = NULL
+  )
+```
+
+**Key Insight**: While bundles represent only ~8% of order count, they drive 16% of revenue. The slightly lower margin (55% vs 59-64% for singles) is offset by higher AOV ($79 vs ~$28), making bundles valuable for customer acquisition.
+
+---
+
+# 5. Customer Retention & Churn
+For subscription-based products, retention is really important.
+
+So I explored churn patterns to see how long customers typically stay subscribed and when drop-off happens.
+
+
+## 5.1 Subscription Churn Analysis
+
+```{r churn-analysis}
+# Churn definition: subscription inactive/canceled after ~60 days
+# Using the churned flag from subscriptions data
+
+churn_summary <- subscriptions %>%
+  summarize(
+    total_subscribers = n(),
+    churned_count = sum(churned),
+    active_count = sum(!churned),
+    churn_rate = mean(churned),
+    avg_months_active = mean(months_active),
+    median_months_active = median(months_active)
+  )
+
+cat("=== Subscription Churn Summary ===\n")
+cat("Total subscription customers:", churn_summary$total_subscribers, "\n")
+cat("Churned:", churn_summary$churned_count, sprintf("(%.1f%%)\n", churn_summary$churn_rate * 100))
+cat("Still Active:", churn_summary$active_count, sprintf("(%.1f%%)\n", (1-churn_summary$churn_rate) * 100))
+cat("Average subscription duration:", round(churn_summary$avg_months_active, 1), "months\n")
+cat("Median subscription duration:", churn_summary$median_months_active, "months\n")
+```
+
+```{r churn-duration}
+# Distribution of subscription duration
+subscriptions %>%
+  ggplot(aes(x = months_active, fill = churned)) +
+  geom_histogram(binwidth = 2, position = "stack", alpha = 0.8) +
+  scale_fill_manual(values = c("TRUE" = blume_colors[2], "FALSE" = blume_colors[4]),
+                    labels = c("TRUE" = "Churned", "FALSE" = "Active")) +
+  labs(
+    title = "Subscription Duration Distribution",
+    subtitle = "Most churn occurs within first 6 months",
+    x = "Months Active",
+    y = "Number of Subscribers",
+    fill = "Status"
+  )
+```
+
+```{r churn-by-month}
+# Monthly churn rate from KPIs
+monthly_kpis %>%
+  ggplot(aes(x = month, y = churn_rate)) +
+  geom_line(color = blume_colors[2], linewidth = 1) +
+  geom_point(color = blume_colors[2], size = 2) +
+  geom_hline(yintercept = mean(monthly_kpis$churn_rate), linetype = "dashed", color = "gray50") +
+  annotate("text", x = max(monthly_kpis$month) - 90, y = 0.075, 
+           label = "Avg: 7%", color = "gray50") +
+  scale_y_continuous(labels = percent_format(), limits = c(0, 0.12)) +
+  scale_x_date(date_labels = "%b %Y", date_breaks = "3 months") +
+  labs(
+    title = "Monthly Churn Rate Trend",
+    subtitle = "Consistent 7% monthly churn rate",
+    x = NULL,
+    y = "Churn Rate"
+  ) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+## 5.2 Cohort Retention Analysis
+
+```{r cohort-analysis}
+# Create cohorts based on first order month
+customers_cohort <- customers %>%
+  mutate(cohort_month = floor_date(first_order_date, "month"))
+
+# Join with orders to get order months
+cohort_orders <- orders %>%
+  left_join(customers_cohort %>% select(customer_id, cohort_month), by = "customer_id") %>%
+  filter(!is.na(cohort_month)) %>%
+  mutate(
+    order_month = floor_date(order_date, "month"),
+    months_since_first = interval(cohort_month, order_month) %/% months(1)
+  )
+
+# Calculate retention by cohort
+cohort_retention <- cohort_orders %>%
+  group_by(cohort_month, months_since_first) %>%
+  summarize(customers = n_distinct(customer_id), .groups = "drop") %>%
+  group_by(cohort_month) %>%
+  mutate(
+    cohort_size = first(customers),
+    retention_rate = customers / cohort_size
+  ) %>%
+  ungroup()
+
+# Filter for complete cohorts (at least 6 months of data)
+recent_cohorts <- cohort_retention %>%
+  filter(cohort_month >= "2024-01-01", cohort_month <= "2025-06-01")
+
+# Plot retention curves for recent cohorts
+recent_cohorts %>%
+  filter(months_since_first <= 12) %>%
+  ggplot(aes(x = months_since_first, y = retention_rate, color = factor(cohort_month))) +
+  geom_line(alpha = 0.6) +
+  geom_point(size = 1, alpha = 0.6) +
+  scale_y_continuous(labels = percent_format(), limits = c(0, 1)) +
+  scale_color_viridis_d(option = "plasma", labels = function(x) format(as.Date(x), "%b %Y")) +
+  labs(
+    title = "Cohort Retention Curves",
+    subtitle = "Customer retention over time by acquisition cohort",
+    x = "Months Since First Purchase",
+    y = "Retention Rate",
+    color = "Cohort"
+  ) +
+  theme(legend.position = "right")
+```
+
+```{r cohort-heatmap}
+# Cohort retention heatmap (simplified for key cohorts)
+cohort_matrix <- recent_cohorts %>%
+  filter(months_since_first <= 8, cohort_month >= "2024-03-01", cohort_month <= "2024-12-01") %>%
+  select(cohort_month, months_since_first, retention_rate) %>%
+  mutate(cohort_label = format(cohort_month, "%b %Y"))
+
+ggplot(cohort_matrix, aes(x = months_since_first, y = reorder(cohort_label, cohort_month), 
+                          fill = retention_rate)) +
+  geom_tile(color = "white") +
+  geom_text(aes(label = percent(retention_rate, accuracy = 1)), size = 3) +
+  scale_fill_gradient(low = "white", high = blume_colors[1], labels = percent_format()) +
+  labs(
+    title = "Cohort Retention Heatmap",
+    subtitle = "Retention rate by cohort and month",
+    x = "Months Since First Purchase",
+    y = "Acquisition Cohort",
+    fill = "Retention"
+  ) +
+  theme(panel.grid = element_blank())
+```
+
+**Key Insight**: The churn rate is around 7% monthly in this dataset, which is fairly typical for subscription ecommerce.Most churn happens within the first 1–3 months, so that seems like the key period where Blume would want to focus on improving customer experience and Cohort retention curves show similar drop-off patterns over time.
+That suggests the customer experience is fairly consistent, rather than one specific month behaving unusually.
+
+
+---
+
+# 6. Revenue Forecasting
+
+To finish the project, I created a simple 6-month revenue forecast, I used a basic trend + moving average approach that is easy to explain and interpret.
+
+
+## 6.1 Simple 6-Month Forecast
+
+Using a combination of linear trend and 3-month moving average for a student-friendly forecast.
+
+```{r forecast-prep}
+# Prepare monthly revenue data
+monthly_revenue <- monthly_kpis %>%
+  select(month, total_revenue) %>%
+  mutate(month_num = row_number())
+
+# Linear trend model
+trend_model <- lm(total_revenue ~ month_num, data = monthly_revenue)
+
+# Summary
+cat("=== Linear Trend Model ===\n")
+cat("Intercept:", dollar(coef(trend_model)[1]), "\n")
+cat("Monthly trend:", dollar(coef(trend_model)[2]), "\n")
+cat("R-squared:", round(summary(trend_model)$r.squared, 4), "\n")
+```
+
+```{r forecast-calc}
+# 3-month moving average for smoothing
+monthly_revenue <- monthly_revenue %>%
+  mutate(
+    ma_3 = zoo::rollmean(total_revenue, k = 3, fill = NA, align = "right"),
+    trend_pred = predict(trend_model, .)
+  )
+
+# Forecast next 6 months
+last_month <- max(monthly_revenue$month)
+last_month_num <- max(monthly_revenue$month_num)
+last_ma <- tail(na.omit(monthly_revenue$ma_3), 1)
+
+# Simple exponential smoothing weight
+alpha <- 0.3
+
+forecast_df <- tibble(
+  month = seq(last_month + months(1), by = "month", length.out = 6),
+  month_num = (last_month_num + 1):(last_month_num + 6)
+) %>%
+  mutate(
+    trend_forecast = predict(trend_model, newdata = .),
+    # Blend trend with recent average (simple approach)
+    blended_forecast = alpha * trend_forecast + (1 - alpha) * last_ma,
+    forecast_low = blended_forecast * 0.90,
+    forecast_high = blended_forecast * 1.10
+  )
+
+# Display forecast
+forecast_df %>%
+  mutate(
+    month = format(month, "%b %Y"),
+    blended_forecast = dollar(blended_forecast),
+    forecast_low = dollar(forecast_low),
+    forecast_high = dollar(forecast_high)
+  ) %>%
+  select(month, blended_forecast, forecast_low, forecast_high) %>%
+  kable(
+    col.names = c("Month", "Forecast", "Low (90%)", "High (110%)"),
+    caption = "6-Month Revenue Forecast (CAD)"
+  ) %>%
+  kable_styling(bootstrap_options = c("striped", "hover"))
+```
+
+```{r forecast-chart}
+# Combine historical and forecast data
+all_data <- bind_rows(
+  monthly_revenue %>% 
+    select(month, total_revenue) %>% 
+    mutate(type = "Historical"),
+  forecast_df %>% 
+    select(month, blended_forecast, forecast_low, forecast_high) %>%
+    rename(total_revenue = blended_forecast) %>%
+    mutate(type = "Forecast")
+)
+
+# Plot
+ggplot() +
+  # Historical data
+  geom_line(data = filter(all_data, type == "Historical"), 
+            aes(x = month, y = total_revenue), color = blume_colors[1], linewidth = 1) +
+  geom_point(data = filter(all_data, type == "Historical"), 
+             aes(x = month, y = total_revenue), color = blume_colors[1], size = 2) +
+  # Forecast with confidence band
+  geom_ribbon(data = forecast_df, 
+              aes(x = month, ymin = forecast_low, ymax = forecast_high), 
+              fill = blume_colors[2], alpha = 0.3) +
+  geom_line(data = filter(all_data, type == "Forecast"), 
+            aes(x = month, y = total_revenue), color = blume_colors[2], linewidth = 1, linetype = "dashed") +
+  geom_point(data = filter(all_data, type == "Forecast"), 
+             aes(x = month, y = total_revenue), color = blume_colors[2], size = 2) +
+  # Reference lines
+  geom_vline(xintercept = last_month, linetype = "dotted", color = "gray50") +
+  annotate("text", x = last_month - 15, y = 30000, label = "Historical", color = blume_colors[1]) +
+  annotate("text", x = last_month + 45, y = 30000, label = "Forecast", color = blume_colors[2]) +
+  scale_y_continuous(labels = dollar_format(), limits = c(20000, 32000)) +
+  scale_x_date(date_labels = "%b %Y", date_breaks = "3 months") +
+  labs(
+    title = "6-Month Revenue Forecast",
+    subtitle = "Trend + Moving Average blend with ±10% confidence band",
+    x = NULL,
+    y = "Monthly Revenue (CAD)"
+  ) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+**Key Insight:** Revenue appears relatively stable with gradual growth over time.
+
+---
+
+# 7. Executive Dashboard Summary
+
+## 7.1 KPI Summary Table
+
+Finally, I summarized the main metrics that a business team would likely track each month.
+
+These KPIs help connect the analysis back to real operational decision-making.
+
+
+```{r kpi-summary}
+# Calculate overall KPIs
+overall_kpis <- tibble(
+  Metric = c("Total Revenue", "Total Orders", "Average Order Value", 
+             "Gross Margin %", "Monthly Churn Rate", "Repeat Customer Rate",
+             "Subscription Revenue Share"),
+  Value = c(
+    dollar(sum(monthly_kpis$total_revenue)),
+    comma(sum(monthly_kpis$orders)),
+    dollar(mean(monthly_kpis$avg_order_value)),
+    percent(mean(monthly_kpis$gross_margin_pct)/100, accuracy = 0.1),
+    percent(mean(monthly_kpis$churn_rate), accuracy = 0.1),
+    percent(repeat_rate, accuracy = 0.1),
+    percent(sum(monthly_kpis$subscription_revenue) / sum(monthly_kpis$total_revenue), accuracy = 0.1)
+  )
+)
+
+overall_kpis %>%
+  kable(caption = "Executive KPI Summary (24 Months)") %>%
+  kable_styling(bootstrap_options = c("striped", "hover"), full_width = FALSE) %>%
+  row_spec(0, bold = TRUE, color = "white", background = blume_colors[1])
+```
+
+## 7.2 Monthly KPI Trend Dashboard
+
+```{r kpi-dashboard, fig.height=10}
+# Create a multi-panel dashboard
+p1 <- ggplot(monthly_kpis, aes(x = month, y = total_revenue)) +
+  geom_col(fill = blume_colors[1], alpha = 0.8) +
+  scale_y_continuous(labels = dollar_format(scale = 0.001, suffix = "K")) +
+  labs(title = "Monthly Revenue", x = NULL, y = "Revenue (CAD)")
+
+p2 <- ggplot(monthly_kpis, aes(x = month, y = orders)) +
+  geom_line(color = blume_colors[2], linewidth = 1) +
+  geom_point(color = blume_colors[2]) +
+  labs(title = "Monthly Orders", x = NULL, y = "Orders")
+
+p3 <- ggplot(monthly_kpis, aes(x = month, y = avg_order_value)) +
+  geom_line(color = blume_colors[3], linewidth = 1) +
+  geom_point(color = blume_colors[3]) +
+  geom_hline(yintercept = mean(monthly_kpis$avg_order_value), linetype = "dashed") +
+  scale_y_continuous(labels = dollar_format()) +
+  labs(title = "Average Order Value", x = NULL, y = "AOV (CAD)")
+
+p4 <- ggplot(monthly_kpis, aes(x = month, y = gross_margin_pct/100)) +
+  geom_area(fill = blume_colors[4], alpha = 0.5) +
+  geom_line(color = blume_colors[4], linewidth = 1) +
+  scale_y_continuous(labels = percent_format(), limits = c(0.55, 0.65)) +
+  labs(title = "Gross Margin %", x = NULL, y = "Margin")
+
+# Combine plots
+library(patchwork)
+(p1 + p2) / (p3 + p4) +
+  plot_annotation(
+    title = "Blume E-commerce KPI Dashboard",
+    subtitle = "24-Month Performance Overview (Jan 2024 - Dec 2025)",
+    theme = theme(plot.title = element_text(face = "bold", size = 16))
+  )
+```
+**Key Insight:** Overall, Blume’s revenue is driven by a mix of best-selling single products and higher-value bundles, with subscriptions providing an additional recurring base.
+
+Tracking AOV, churn, and gross margin together gives a clearer picture of growth and sustainability.
+
+---
+
+# 8. Key Findings & Recommendations
+
+## Summary of Insights
+
+| Area | Finding | Recommendation |
+|------|---------|----------------|
+| **Revenue Drivers** | Bundle products drive 16% of revenue with high AOV ($79) | Promote bundle offerings; consider new bundle combinations |
+| **Pricing** | 59% of orders at full price; healthy margin preservation | Maintain strategic discount discipline |
+| **Profitability** | Consistent 59% gross margin across categories | Monitor COGS; superfood lattes are margin leaders |
+| **Retention** | 7% monthly churn; critical window is months 1-3 | Focus retention efforts on early subscriber engagement |
+| **Forecast** | Stable ~$25K monthly revenue expected | Plan for consistent operations; no major seasonality |
+
+## Limitations
+
+This project uses simulated transaction data based on real Blume product pricing and general ecommerce benchmarks.
+
+Because Blume’s internal cost structure, marketing spend, and true customer behavior aren’t publicly available, results should be viewed as educational rather than financial reporting.
+
+---
+
+# Session Info
+
+```{r session-info}
+sessionInfo()
+```
